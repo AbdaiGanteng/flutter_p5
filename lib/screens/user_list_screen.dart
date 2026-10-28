@@ -5,19 +5,29 @@ import '../widgets/user_card.dart';
 
 class UserListScreen extends StatefulWidget {
   const UserListScreen({super.key});
+
   @override
   State<UserListScreen> createState() => _UserListScreenState();
 }
 
 class _UserListScreenState extends State<UserListScreen> {
   final ApiService _apiService = ApiService();
-  List<User> _users = [];
+  List<User> _allUsers = [];
+  List<User> _filteredUsers = [];
   bool _isLoading = true;
   String? _errorMessage;
+  final TextEditingController _searchController = TextEditingController();
+
   @override
   void initState() {
     super.initState();
     _loadUsers();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadUsers() async {
@@ -25,10 +35,12 @@ class _UserListScreenState extends State<UserListScreen> {
       _isLoading = true;
       _errorMessage = null;
     });
+
     try {
       final users = await _apiService.getUsers();
       setState(() {
-        _users = users;
+        _allUsers = users;
+        _filteredUsers = users;
         _isLoading = false;
       });
     } catch (e) {
@@ -37,6 +49,21 @@ class _UserListScreenState extends State<UserListScreen> {
         _isLoading = false;
       });
     }
+  }
+
+  // Filter Real-Time (Latihan 4)
+  void _filterUsers(String query) {
+    setState(() {
+      if (query.isEmpty) {
+        _filteredUsers = _allUsers;
+      } else {
+        _filteredUsers = _allUsers.where((user) {
+          final nameMatch = user.name.toLowerCase().contains(query.toLowerCase());
+          final emailMatch = user.email.toLowerCase().contains(query.toLowerCase());
+          return nameMatch || emailMatch;
+        }).toList();
+      }
+    });
   }
 
   @override
@@ -59,7 +86,6 @@ class _UserListScreenState extends State<UserListScreen> {
   }
 
   Widget _buildBody() {
-    // Loading state
     if (_isLoading) {
       return const Center(
         child: Column(
@@ -72,7 +98,7 @@ class _UserListScreenState extends State<UserListScreen> {
         ),
       );
     }
-    // Error state
+
     if (_errorMessage != null) {
       return Center(
         child: Padding(
@@ -82,16 +108,9 @@ class _UserListScreenState extends State<UserListScreen> {
             children: [
               const Icon(Icons.error_outline, size: 64, color: Colors.red),
               const SizedBox(height: 16),
-              const Text(
-                'Terjadi Kesalahan',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-              ),
+              const Text('Terjadi Kesalahan', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
-              Text(
-                _errorMessage!,
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.grey),
-              ),
+              Text(_errorMessage!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.grey)),
               const SizedBox(height: 24),
               ElevatedButton.icon(
                 onPressed: _loadUsers,
@@ -103,25 +122,49 @@ class _UserListScreenState extends State<UserListScreen> {
         ),
       );
     }
-    // Empty state
-    if (_users.isEmpty) {
-      return const Center(child: Text('Tidak ada data pengguna'));
-    }
-    // Success state
-    return RefreshIndicator(
-      onRefresh: _loadUsers,
-      child: ListView.builder(
-        itemCount: _users.length,
-        itemBuilder: (context, index) {
-          final user = _users[index];
-          return UserCard(
-            user: user,
-            onTap: () {
-              _showUserDetail(user);
-            },
-          );
-        },
-      ),
+
+    return Column(
+      children: [
+        // TextField Pencarian (Latihan 4)
+        Padding(
+          padding: const EdgeInsets.all(12.0),
+          child: TextField(
+            controller: _searchController,
+            onChanged: _filterUsers,
+            decoration: InputDecoration(
+              hintText: 'Cari nama atau email...',
+              prefixIcon: const Icon(Icons.search),
+              suffixIcon: _searchController.text.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear),
+                      onPressed: () {
+                        _searchController.clear();
+                        _filterUsers('');
+                      },
+                    )
+                  : null,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+          ),
+        ),
+        Expanded(
+          child: _filteredUsers.isEmpty
+              ? const Center(child: Text('Tidak ada data pengguna'))
+              : RefreshIndicator(
+                  onRefresh: _loadUsers,
+                  child: ListView.builder(
+                    itemCount: _filteredUsers.length,
+                    itemBuilder: (context, index) {
+                      final user = _filteredUsers[index];
+                      return UserCard(
+                        user: user,
+                        onTap: () => _showUserDetail(user),
+                      );
+                    },
+                  ),
+                ),
+        ),
+      ],
     );
   }
 
@@ -134,10 +177,7 @@ class _UserListScreenState extends State<UserListScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              user.name,
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-            ),
+            Text(user.name, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             Text('Username: ${user.username}'),
             Text('Email: ${user.email}'),

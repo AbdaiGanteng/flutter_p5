@@ -1,4 +1,3 @@
-
 class User {
   final int id;
   final String name;
@@ -30,6 +29,7 @@ class User {
     );
   }
 
+  // Inisial untuk Avatar
   String get initial {
     if (name.isEmpty) return '?';
     return name[0].toUpperCase();
